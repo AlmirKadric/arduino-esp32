@@ -45,6 +45,33 @@ void WiFiMulti::APlistClean(void) {
   APlist.clear();
 }
 
+void WiFiMulti::APlistPurgeBegin() {
+  for (uint32_t x = 0; x < APlist.size(); x++) {
+    APlist[x].shouldPurge = true;
+  }
+}
+
+void WiFiMulti::APlistPurgeCommit() {
+  std::erase_if(APlist, [](WifiAPlist_t entry){
+    if (entry.shouldPurge) {
+      if (entry.ssid) {
+        free(entry.ssid);
+      }
+      if (entry.passphrase) {
+        free(entry.passphrase);
+      }
+      return true;
+    }
+    return false;
+  });
+}
+
+void WiFiMulti::APlistPurgeCancel() {
+  for (uint32_t x = 0; x < APlist.size(); x++) {
+    APlist[x].shouldPurge = false;
+  }
+}
+
 WiFiMulti::~WiFiMulti() {
   APlistClean();
 }
@@ -82,6 +109,16 @@ bool WiFiMulti::addAP(const char *ssid, const char *passphrase) {
     newAP.passphrase = NULL;
   }
   newAP.hasFailed = false;
+  newAP.shouldPurge = false;
+  for (auto entry : APlist) {
+    if ((strcmp(entry.ssid, newAP.ssid) == 0) && (
+      (entry.passphrase == NULL && newAP.passphrase == NULL) ||
+      (strcmp(entry.passphrase, newAP.passphrase) == 0)
+    )) {
+      APlist.push_back(newAP);
+      return true;
+    }
+  }
   APlist.push_back(newAP);
   log_i("[WIFI][APlistAdd] add SSID: %s", newAP.ssid);
   return true;
@@ -120,7 +157,7 @@ uint8_t WiFiMulti::run(uint32_t connectTimeout, bool scanHidden) {
   } else if (scanResult >= 0) {
     // scan done analyze
     int32_t bestIndex = -1;
-    WifiAPlist_t bestNetwork{NULL, NULL, false};
+    WifiAPlist_t bestNetwork{NULL, NULL, false, false};
     int bestNetworkDb = INT_MIN;
     int bestNetworkSec = WIFI_AUTH_MAX;
     uint8_t bestBSSID[6];

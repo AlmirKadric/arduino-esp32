@@ -36,6 +36,7 @@ typedef struct {
   char *ssid;
   char *passphrase;
   bool hasFailed;
+  bool shouldPurge;
 } WifiAPlist_t;
 
 typedef std::function<bool(void)> ConnectionTestCB_t;
@@ -61,6 +62,16 @@ public:
 
   // clears the current list of Multi APs and frees the memory
   void APlistClean(void);
+
+  // marks all current AP entries to be purged
+  // this allows us to clear a list as it was a certain point in time
+  void APlistPurgeBegin(void);
+
+  // clears all AP items which have a truthful purge flag
+  void APlistPurgeCommit(void);
+
+  // removes the purge flag for all AP items
+  void APlistPurgeCancel(void);
 
   // allow the user to define a callback function that will validate the connection to the Internet.
   // if the callback returns true, the connection is considered valid and the AP will added to the validated AP list.
