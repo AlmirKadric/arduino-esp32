@@ -29,6 +29,8 @@
 #define IPADDRESS_V4_BYTES_INDEX 12
 #define IPADDRESS_V4_DWORD_INDEX 3
 
+#undef INADDR_NONE
+
 // A class to make it easier to handle and pass around IP addresses
 
 enum IPType {
