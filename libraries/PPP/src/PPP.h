@@ -27,7 +27,7 @@ public:
   PPPClass();
   ~PPPClass();
 
-  bool begin(ppp_modem_model_t model, uint8_t uart_num = 1, int baud_rate = 115200);
+  bool begin(ppp_modem_model_t model, uint8_t uart_num = 1, int baud_rate = 115200, int rx_buffer_size = 4096, int tx_buffer_size = 512);
   void end();
 
   // Required for connecting to internet
@@ -104,8 +104,6 @@ private:
   uint32_t _pin_rst_delay;
   const char *_pin;
   const char *_apn;
-  int _rx_buffer_size;
-  int _tx_buffer_size;
   esp_modem_dce_mode_t _mode;
   uint8_t _uart_num;
   network_event_handle_t _ppp_event_handle;

@@ -152,7 +152,7 @@ esp_modem_dce_t *PPPClass::handle() const {
 
 PPPClass::PPPClass()
   : _dce(NULL), _pin_tx(-1), _pin_rx(-1), _pin_rts(-1), _pin_cts(-1), _flow_ctrl(ESP_MODEM_FLOW_CONTROL_NONE), _pin_rst(-1), _pin_rst_act_low(true),
-    _pin_rst_delay(200), _pin(NULL), _apn(NULL), _rx_buffer_size(4096), _tx_buffer_size(512), _mode(ESP_MODEM_MODE_COMMAND), _uart_num(UART_NUM_1),
+    _pin_rst_delay(200), _pin(NULL), _apn(NULL), _mode(ESP_MODEM_MODE_COMMAND), _uart_num(UART_NUM_1),
     _ppp_event_handle(0) {}
 
 PPPClass::~PPPClass() {}
@@ -225,7 +225,7 @@ bool PPPClass::setPins(int8_t tx, int8_t rx, int8_t rts, int8_t cts, esp_modem_f
   return true;
 }
 
-bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate) {
+bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate, int rx_buffer_size, int tx_buffer_size) {
   esp_err_t ret = ESP_OK;
   bool pin_ok = false;
   int tries = 0;
@@ -279,8 +279,8 @@ bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate) {
   dte_config.uart_config.rts_io_num = _pin_rts;
   dte_config.uart_config.cts_io_num = _pin_cts;
   dte_config.uart_config.flow_control = _flow_ctrl;
-  dte_config.uart_config.rx_buffer_size = _rx_buffer_size;
-  dte_config.uart_config.tx_buffer_size = _tx_buffer_size;
+  dte_config.uart_config.rx_buffer_size = rx_buffer_size;
+  dte_config.uart_config.tx_buffer_size = tx_buffer_size;
   dte_config.uart_config.port_num = (uart_port_t)_uart_num;
   dte_config.uart_config.baud_rate = baud_rate;
 
