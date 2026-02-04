@@ -200,6 +200,9 @@ bool WiFiSTAClass::config(IPAddress local_ip, IPAddress dns) {
  * @param dns1       Static DNS server 1
  * @param dns2       Static DNS server 2 (optional)
  */
+bool WiFiSTAClass::setDNS(IPAddress dns1) {
+  return STA.begin() && STA.dnsIP(0, dns1);
+}
 bool WiFiSTAClass::setDNS(IPAddress dns1, IPAddress dns2) {
   return STA.begin() && STA.dnsIP(0, dns1) && STA.dnsIP(1, dns2);
 }

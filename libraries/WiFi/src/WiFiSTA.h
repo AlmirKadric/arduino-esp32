@@ -142,7 +142,8 @@ public:
   // two and one parameter version. 2nd parameter is DNS like in Arduino
   bool config(IPAddress local_ip, IPAddress dns = (uint32_t)0x00000000);
 
-  bool setDNS(IPAddress dns1, IPAddress dns2 = (uint32_t)0x00000000);  // sets DNS IP for all network interfaces
+  bool setDNS(IPAddress dns1);  // sets DNS IP for all network interfaces
+  bool setDNS(IPAddress dns1, IPAddress dns2);  // sets DNS IP for all network interfaces
 
   bool bandwidth(wifi_bandwidth_t bandwidth);
 
