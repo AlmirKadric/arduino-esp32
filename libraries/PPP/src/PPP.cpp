@@ -7,6 +7,7 @@
 #include <string>
 #include "driver/uart.h"
 #include "hal/uart_ll.h"
+#include "esp_private/gpio.h"
 #include "esp_private/uart_share_hw_ctrl.h"
 
 #define PPP_CMD_MODE_CHECK(x)                                    \
@@ -289,7 +290,7 @@ bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate, i
 
   /* Reset the Modem */
   if (_pin_rst >= 0) {
-    log_v("Resetting the modem");
+    log_e("Resetting the modem");
     if (_pin_rst_act_low) {
       pinMode(_pin_rst, OUTPUT_OPEN_DRAIN);
     } else {
@@ -300,6 +301,15 @@ bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate, i
     delay(_pin_rst_delay);
     digitalWrite(_pin_rst, _pin_rst_act_low);
     delay(100);
+  }
+
+  /* Ensure UART RTS/CTS pins are LOW until flow control is enabled */
+  if (_flow_ctrl == ESP_MODEM_FLOW_CONTROL_HW) {
+    gpio_output_enable((gpio_num_t)_pin_rts);
+    gpio_set_level((gpio_num_t)_pin_rts, 0);
+
+    gpio_output_enable((gpio_num_t)_pin_cts);
+    gpio_set_level((gpio_num_t)_pin_cts, 0);
   }
 
   /* Start the DCE */
@@ -345,12 +355,30 @@ bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate, i
   }
 
   /* enable flow control */
-  if (dte_config.uart_config.flow_control == ESP_MODEM_FLOW_CONTROL_HW) {
+  if (_flow_ctrl == ESP_MODEM_FLOW_CONTROL_HW) {
     ret = esp_modem_set_flow_control(_dce, 2, 2);  //2/2 means HW Flow Control.
     if (ret != ESP_OK) {
       log_e("Failed to set the hardware flow control: [%d] %s", ret, esp_err_to_name(ret));
       goto err;
     }
+  }
+
+  /* set CTS pin pull mode */
+  if (_flow_ctrl == ESP_MODEM_FLOW_CONTROL_HW) {
+    // modem CTS is: active: FLOAT, inactive: LOW
+    // this ensures CTS is HIGH when floating
+    // gpio_set_pull_mode((gpio_num_t)_pin_cts, GPIO_PULLUP_ONLY);
+    // modem CTS is: active: HIGH, inactive: FLOAT
+    // this ensures CTS is LOW when floating
+    // gpio_set_pull_mode((gpio_num_t)_pin_cts, GPIO_PULLDOWN_ONLY);
+    // modem CTS is: active: HIGH, inactive: LOW
+    // this means that CTS will never float
+    gpio_set_pull_mode((gpio_num_t)_pin_cts, GPIO_FLOATING);
+  }
+
+  /* remove CTS pin forced LOW */
+  if (_flow_ctrl == ESP_MODEM_FLOW_CONTROL_HW) {
+		gpio_output_disable((gpio_num_t)_pin_cts);
   }
 
   /* check if PIN needed */
@@ -379,12 +407,14 @@ void PPPClass::end(void) {
   if (_esp_modem && _esp_netif && _dce) {
 
     if ((getStatusBits() & ESP_NETIF_CONNECTED_BIT) != 0) {
+      log_e("DISCONNECT");
       clearStatusBits(ESP_NETIF_CONNECTED_BIT | ESP_NETIF_HAS_IP_BIT | ESP_NETIF_HAS_LOCAL_IP6_BIT | ESP_NETIF_HAS_GLOBAL_IP6_BIT);
       arduino_event_t disconnect_event;
       disconnect_event.event_id = ARDUINO_EVENT_PPP_DISCONNECTED;
       Network.postEvent(&disconnect_event);
     }
 
+    log_e("PPPOS STOP");
     clearStatusBits(
       ESP_NETIF_STARTED_BIT | ESP_NETIF_CONNECTED_BIT | ESP_NETIF_HAS_IP_BIT | ESP_NETIF_HAS_LOCAL_IP6_BIT | ESP_NETIF_HAS_GLOBAL_IP6_BIT
       | ESP_NETIF_HAS_STATIC_IP_BIT
@@ -394,23 +424,32 @@ void PPPClass::end(void) {
     Network.postEvent(&arduino_event);
   }
 
-  destroyNetif();
-
   if (_ppp_ev_instance != NULL) {
+    log_e("UNREGISTER EVENT");
     if (esp_event_handler_unregister(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &_ppp_event_cb) == ESP_OK) {
       _ppp_ev_instance = NULL;
     }
   }
   _esp_modem = NULL;
 
+  log_e("NETWORK REMOVE EVENT");
   Network.removeEvent(_ppp_event_handle);
   _ppp_event_handle = 0;
 
   if (_dce != NULL) {
+    log_e("DISABLE CONTROL FLOW");
+    if (_flow_ctrl == ESP_MODEM_FLOW_CONTROL_HW) {
+      uart_set_hw_flow_ctrl((uart_port_t)_uart_num, UART_HW_FLOWCTRL_DISABLE, 0);
+    }
+    log_e("DESTROY");
     esp_modem_destroy(_dce);
     _dce = NULL;
   }
 
+  log_e("DESTROY NETIF");
+  destroyNetif();
+
+  log_e("CLEAR PINS");
   int8_t pin = -1;
   if (_pin_tx != -1) {
     pin = _pin_tx;
@@ -438,6 +477,7 @@ void PPPClass::end(void) {
     perimanClearPinBus(pin);
   }
 
+  log_e("DONE");
   _mode = ESP_MODEM_MODE_COMMAND;
 }
 
@@ -655,15 +695,12 @@ bool PPPClass::setBaudrate(int baudrate) {
     return false;
   }
 
-  uint32_t sclk_freq;
-  err = uart_get_sclk_freq(UART_SCLK_DEFAULT, &sclk_freq);
-  if (err != ESP_OK) {
-    log_e("uart_get_sclk_freq failed with %d %s", err, esp_err_to_name(err));
-    return false;
-  }
+  delay(200);
 
-  HP_UART_SRC_CLK_ATOMIC() {
-    uart_ll_set_baudrate(UART_LL_GET_HW(_uart_num), (uint32_t)baudrate, sclk_freq);
+  err = uart_set_baudrate((uart_port_t)_uart_num, (uint32_t)baudrate);
+  if (err != ESP_OK) {
+    log_e("uart_set_baudrate failed with %d %s", err, esp_err_to_name(err));
+    return false;
   }
 
   return true;
