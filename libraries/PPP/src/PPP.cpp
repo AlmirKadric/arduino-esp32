@@ -226,7 +226,7 @@ bool PPPClass::setPins(int8_t tx, int8_t rx, int8_t rts, int8_t cts, esp_modem_f
   return true;
 }
 
-bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate, int rx_buffer_size, int tx_buffer_size) {
+bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate, int rx_buffer_size, int tx_buffer_size, BaseType_t uart_core) {
   esp_err_t ret = ESP_OK;
   bool pin_ok = false;
   int tries = 0;
@@ -275,6 +275,7 @@ bool PPPClass::begin(ppp_modem_model_t model, uint8_t uart_num, int baud_rate, i
 
   /* Configure the DTE */
   esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
+  dte_config.task_core = uart_core;
   dte_config.uart_config.tx_io_num = _pin_tx;
   dte_config.uart_config.rx_io_num = _pin_rx;
   dte_config.uart_config.rts_io_num = _pin_rts;

@@ -27,7 +27,7 @@ public:
   PPPClass();
   ~PPPClass();
 
-  bool begin(ppp_modem_model_t model, uint8_t uart_num = 1, int baud_rate = 115200, int rx_buffer_size = 4096, int tx_buffer_size = 512);
+  bool begin(ppp_modem_model_t model, uint8_t uart_num = 1, int baud_rate = 115200, int rx_buffer_size = 4096, int tx_buffer_size = 512, BaseType_t uart_core = -1);
   void end();
 
   // Required for connecting to internet
