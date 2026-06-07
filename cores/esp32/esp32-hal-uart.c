@@ -1327,7 +1327,20 @@ int uartGetDebug() {
   return s_uart_debug_nr;
 }
 
+__attribute__((weak)) int kokoro_arduino_log_vprintf(const char *format, va_list arg) {
+  (void)format;
+  (void)arg;
+  return -1;
+}
+
 int log_printfv(const char *format, va_list arg) {
+  va_list kokoro_arg;
+  va_copy(kokoro_arg, arg);
+  int kokoro_len = kokoro_arduino_log_vprintf(format, kokoro_arg);
+  va_end(kokoro_arg);
+  if (kokoro_len >= 0) {
+    return kokoro_len;
+  }
   static char loc_buf[64];
   char *temp = loc_buf;
   uint32_t len;
